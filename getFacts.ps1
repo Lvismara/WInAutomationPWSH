@@ -11,7 +11,7 @@ mkdir $hostName
 
 # Diretórios compartilhados e permissões
 
-powershell -ExecutionPolicy ByPass -File ListAllSharedFolderPermission.ps1 | Out-File ./$hostName/$hostName"_Paths_"$((Get-Date).ToString('MM-dd-yyyy')).csv
+powershell -ExecutionPolicy ByPass -File ListAllSharedFolderPermission.ps1 | Format-Table | Out-File ./$hostName/$hostName"_Paths_"$((Get-Date).ToString('MM-dd-yyyy')).csv
 
 # Variáveis de ambiente
 
@@ -23,13 +23,37 @@ systeminfo /fo csv | ConvertFrom-Csv | select OS*, System*, Hotfix* | Export-Csv
 
 # Schedules (agendador de tarefas)
 
-schtasks /fo csv /query | Out-File ./$hostName/$hostName"_SchedulesTasks_"$((Get-Date).ToString('MM-dd-yyyy')).csv
+$tasks=schtasks /v /fo csv /query | Where-Object {$_.TaskName -ne "TaskName"} | ConvertFrom-Csv 
+$tasks | Where-Object {$_.TaskName -ne "TaskName"} | Export-Csv -path ./$hostName/$hostName"_SchedulesTasks_"$((Get-Date).ToString('MM-dd-yyyy')).csv
 
 # Lista de comunicação- Ips de entrada e saida (Comunicação entre os servidores), portas listen, etc
 
 #netstat -ano | Out-File ./$hostName/Network_$((Get-Date).ToString('MM-dd-yyyy')).csv 
 
-netstat -ano| ConvertFrom-Csv | Export-Csv -path ./$hostName/$hostName"_Network_"$((Get-Date).ToString('MM-dd-yyyy')).csv 
+#$net=netstat -ano  ConvertFrom-Csv | Export-Csv -path ./$hostName/$hostName"_Network_"$((Get-Date).ToString('MM-dd-yyyy')).csv 
+
+$data = (netstat -bano |select -skip 4 | Out-String) -replace '(?m)^  (TCP|UDP)', '$1' -replace '\r?\n\s+([^\[])', "`t`$1" -replace '\r?\n\s+\[', "`t[" -split "`n"
+
+[regex]$regex = '(?<protocol>TCP|UDP)\s+(?<address>\d+.\d+.\d+.\d+|\[::\]|\[::1\]):(?<port>\d+).+(?<state>LISTENING|\*:\*)\s+(?<pid>\d+)\s+(?<service>Can not obtain ownership information|\[\w+.exe\]|\w+\s+\[\w+.exe\])'
+
+$output = @()
+
+$data | foreach {
+    $_ -match $regex
+
+    $outputobj = @{
+        protocol = [string]$matches.protocol
+        address = [string]$matches.address -replace '\[::\]','[..]' -replace '\[::1\]','[..1]'
+        port = [int]$matches.port
+        state = [string]$matches.state -replace "\*:\*",'NA'
+        pid = [int]$matches.pid
+        service = ([string]$matches.service -replace 'Can not obtain ownership information','[System' -split '.*\[')[1] -replace '\]',''
+        subservice = ([string]$matches.service  -replace 'Can not obtain ownership information','' -split '\[.*\]')[0]
+    }
+    $output += New-Object -TypeName PSobject -Property $outputobj
+}
+
+$output |select address,port,protocol,pid,state,service,subservice | Export-Csv -path ./$hostName/$hostName"_Network_"$((Get-Date).ToString('MM-dd-yyyy')).csv 
 
 # Serviços ativos:
  
