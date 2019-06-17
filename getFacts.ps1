@@ -1,38 +1,48 @@
+
+$Pcname = $env:COMPUTERNAME #get-host | select Name 
+
+$hostName = $Pcname.Name+$((Get-Date).ToString('MM-dd-yyyy'))
+
+mkdir $hostName
+
 # Discos locais e remotos montados
 
-[System.IO.DriveInfo]::GetDrives() | Format-Table | Export-Csv -path ./Discos.csv
+[System.IO.DriveInfo]::GetDrives() | Export-Csv -path ./$hostName/Discs_$((Get-Date).ToString('MM-dd-yyyy')).csv
 
 # Diretórios compartilhados e permissões
 
-powershell -ExecutionPolicy ByPass -File ListAllSharedFolderPermission.ps1 | Export-Csv -path ./Paths.csv
+powershell -ExecutionPolicy ByPass -File ListAllSharedFolderPermission.ps1 | Out-File ./$hostName/Paths$((Get-Date).ToString('MM-dd-yyyy')).csv
 
 # Variáveis de ambiente
 
-Get-ChildItem Env: | Export-Csv -path ./Enviroment.csv
+Get-ChildItem Env: | select Key*, Value* | Export-Csv -path ./$hostName/Enviroment_$((Get-Date).ToString('MM-dd-yyyy')).csv 
                
 # Versão do windows e update
 
-systeminfo /fo csv | ConvertFrom-Csv | select OS*, System*, Hotfix* | Format-List | Export-Csv -path ./WinVersion.csv
+systeminfo /fo csv | ConvertFrom-Csv | select OS*, System*, Hotfix* | Export-Csv -path ./$hostName/WinVersion_$((Get-Date).ToString('MM-dd-yyyy')).csv
 
 # Schedules (agendador de tarefas)
 
-schtasks /query /fo LIST | Export-Csv -path ./SchedulesTasks.csv
+schtasks /fo csv /query | Out-File ./$hostName/SchedulesTasks_$((Get-Date).ToString('MM-dd-yyyy')).csv
 
 # Lista de comunicação- Ips de entrada e saida (Comunicação entre os servidores), portas listen, etc
 
-netstat -an | Export-Csv -path ./Net.csv
-               
-# Programas em execução:
+#netstat -ano | Out-File ./$hostName/Network_$((Get-Date).ToString('MM-dd-yyyy')).csv 
 
- 
+netstat -ano| ConvertFrom-Csv | Export-Csv -path ./$hostName/Network_$((Get-Date).ToString('MM-dd-yyyy')).csv 
+
 # Serviços ativos:
+ 
+get-service | Export-Csv -path ./$hostName/services_$((Get-Date).ToString('MM-dd-yyyy')).csv
 
-get-services | Export-Csv -path ./services.csv
+# Programas instalados e vers=ões:
 
-# Programas instalados e versões:
-
-Get-WmiObject -Class Win32_Product -ComputerName . | Format-List -Property Name,InstallDate,InstallLocation,PackageCache,Vendor,Version,IdentifyingNumber | Export-Csv -path ./Packages.csv
+Get-WmiObject -Class Win32_Product -ComputerName . -Property Name,InstallDate,InstallLocation,PackageCache,Vendor,Version,IdentifyingNumber | Export-Csv -path ./$hostName/Packages_$((Get-Date).ToString('MM-dd-yyyy')).csv
 
 # Verificar usuário locais com permissão de administrador.
 
-Get-WmiObject  -Class Win32_UserAccount|select * | Export-Csv -path ./Users.csv
+Get-WmiObject  -Class Win32_UserAccount |select * |  Export-Csv -path ./$hostName/LocalUsers_$((Get-Date).ToString('MM-dd-yyyy')).csv
+
+#Sever inventory
+
+powershell -ExecutionPolicy ByPass -File get-inventory.ps1
