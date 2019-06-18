@@ -11,7 +11,7 @@ mkdir $hostName
 
 # Diretórios compartilhados e permissões
 
-powershell -ExecutionPolicy ByPass -File ListAllSharedFolderPermission.ps1 | Format-Table | Out-File ./$hostName/$hostName"_Paths_"$((Get-Date).ToString('MM-dd-yyyy')).csv
+powershell -ExecutionPolicy ByPass -File ListAllSharedFolderPermission.ps1 
 
 # Variáveis de ambiente
 

@@ -67,6 +67,9 @@ $ErrorActionPreference = "SilentlyContinue"
 
 Function GetSharedFolderPermission($ComputerName)
 {
+	$Pcname = $env:COMPUTERNAME #get-host | select Name 
+
+	$hostName = $Pcname+"_"+$((Get-Date).ToString('MM-dd-yyyy'))
 	#test server connectivity
 	$PingResult = Test-Connection -ComputerName $ComputerName -Count 1 -Quiet
 	if($PingResult)
@@ -82,14 +85,17 @@ Function GetSharedFolderPermission($ComputerName)
 			$SharedFolderSecs = Get-WmiObject -Class Win32_LogicalShareSecuritySetting `
 			-ComputerName $ComputerName -ErrorAction SilentlyContinue
 		}
-		
+		$Objs = @() #define the empty array
 		foreach ($SharedFolderSec in $SharedFolderSecs) 
 		{ 
-		    $Objs = @() #define the empty array
+		    #$Objs = @() #define the empty array
 			
 	        $SecDescriptor = $SharedFolderSec.GetSecurityDescriptor()
 	        foreach($DACL in $SecDescriptor.Descriptor.DACL)
 			{  
+				$SharedFolderPathfile = [regex]::Escape($SharedFolderSec.Name)
+				$ShareFolderPath = Get-WmiObject -Class win32_share -computername $ComputerName -Filter "Name='$SharedFolderPathfile'" 
+		
 				$DACLDomain = $DACL.Trustee.Domain
 				$DACLName = $DACL.Trustee.Name
 				if($DACLDomain -ne $null)
@@ -106,6 +112,7 @@ Function GetSharedFolderPermission($ComputerName)
 								'ConnectionStatus' = "Success"
 								'SharedFolderName' = $SharedFolderSec.Name
 								'SecurityPrincipal' = $UserName
+								'Path' = $ShareFolderPath.Path
 								'FileSystemRights' = [Security.AccessControl.FileSystemRights]`
 								$($DACL.AccessMask -as [Security.AccessControl.FileSystemRights])
 								'AccessControlType' = [Security.AccessControl.AceType]$DACL.AceType}
@@ -113,9 +120,11 @@ Function GetSharedFolderPermission($ComputerName)
 				$Objs += $SharedACLs
 
 	        }
-			$Objs|Select-Object ComputerName,ConnectionStatus,SharedFolderName,SecurityPrincipal, `
-			FileSystemRights,AccessControlType
+			#$Objs|Select-Object ComputerName,ConnectionStatus,SharedFolderName,SecurityPrincipal, Path,`
+			#FileSystemRights,AccessControlType 
+			
 	    }  
+		$Objs|export-csv -path ./$hostName/$hostName"_NetShare_"$((Get-Date).ToString('MM-dd-yyyy')).csv
 	}
 	else
 	{
@@ -124,16 +133,21 @@ Function GetSharedFolderPermission($ComputerName)
 						'SharedFolderName' = "Not Available"
 						'SecurityPrincipal' = "Not Available"
 						'FileSystemRights' = "Not Available"
-						'AccessControlType' = "Not Available"}
+						'AccessControlType' = "Not Available1"}
 		$SharedACLs = New-Object -TypeName PSObject -Property $Properties
 		$Objs += $SharedACLs
-		$Objs|Select-Object ComputerName,ConnectionStatus,SharedFolderName,SecurityPrincipal, `
-		FileSystemRights,AccessControlType
+		#$Objs|format-table ComputerName,ConnectionStatus,SharedFolderName,SecurityPrincipal, `
+		#FileSystemRights,AccessControlType
+		$Objs|export-csv -path ./$hostName/$hostName"_NetShare_"$((Get-Date).ToString('MM-dd-yyyy')).csv
 	}
 }
 
 Function GetSharedFolderNTFSPermission($ComputerName)
 {
+	$Pcname = $env:COMPUTERNAME #get-host | select Name 
+
+	$hostName = $Pcname+"_"+$((Get-Date).ToString('MM-dd-yyyy'))
+	
 	#test server connectivity
 	$PingResult = Test-Connection -ComputerName $ComputerName -Count 1 -Quiet
 	if($PingResult)
@@ -149,10 +163,10 @@ Function GetSharedFolderNTFSPermission($ComputerName)
 			$SharedFolders = Get-WmiObject -Class Win32_Share `
 			-ComputerName $ComputerName -ErrorAction SilentlyContinue
 		}
-
+		$Objs = @()
 		foreach($SharedFolder in $SharedFolders)
 		{
-			$Objs = @()
+			#$Objs = @()
 			
 			$SharedFolderPath = [regex]::Escape($SharedFolder.Path)
 			if($Credential)
@@ -184,6 +198,7 @@ Function GetSharedFolderNTFSPermission($ComputerName)
 				$Properties = @{'ComputerName' = $ComputerName
 								'ConnectionStatus' = "Success"
 								'SharedFolderName' = $SharedFolder.Name
+								'Path' = $SharedFolder.Path
 								'SecurityPrincipal' = $UserName
 								'FileSystemRights' = [Security.AccessControl.FileSystemRights]`
 								$($DACL.AccessMask -as [Security.AccessControl.FileSystemRights])
@@ -193,9 +208,10 @@ Function GetSharedFolderNTFSPermission($ComputerName)
 				$SharedNTFSACL = New-Object -TypeName PSObject -Property $Properties
 	            $Objs += $SharedNTFSACL
 	        }
-			$Objs |Select-Object ComputerName,ConnectionStatus,SharedFolderName,SecurityPrincipal,FileSystemRights, `
-			AccessControlType,AccessControlFalgs -Unique
+			#$Objs |Select-Object ComputerName,ConnectionStatus,SharedFolderName,SecurityPrincipal,FileSystemRights,Path, `
+			#AccessControlType,AccessControlFalgs -Unique
 		}
+		$Objs|export-csv -path ./$hostName/$hostName"_NetShare_"$((Get-Date).ToString('MM-dd-yyyy')).csv
 	}
 	else
 	{
@@ -205,12 +221,13 @@ Function GetSharedFolderNTFSPermission($ComputerName)
 						'SecurityPrincipal' = "Not Available"
 						'FileSystemRights' = "Not Available"
 						'AccessControlType' = "Not Available"
-						'AccessControlFalgs' = "Not Available"}
+						'AccessControlFalgs' = "Not Available1"}
 					
 		$SharedNTFSACL = New-Object -TypeName PSObject -Property $Properties
 	    $Objs += $SharedNTFSACL
-		$Objs |Select-Object ComputerName,ConnectionStatus,SharedFolderName,SecurityPrincipal,FileSystemRights, `
-		AccessControlType,AccessControlFalgs -Unique
+		#$Objs |format-list ComputerName,ConnectionStatus,SharedFolderName,SecurityPrincipal,FileSystemRights, `
+		#AccessControlType,AccessControlFalgs -Unique 
+		$Objs|export-csv -path ./$hostName/$hostName"_NetShare_"$((Get-Date).ToString('MM-dd-yyyy')).csv
 	}
 } 
 
@@ -227,4 +244,3 @@ foreach($CN in $ComputerName)
 	}
 }
 #restore the error action
-$ErrorActionPreference = $RecordErrorAction
