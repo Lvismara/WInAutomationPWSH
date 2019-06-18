@@ -28,32 +28,15 @@ $tasks | Where-Object {$_.TaskName -ne "TaskName"} | Export-Csv -path ./$hostNam
 
 # Lista de comunicação- Ips de entrada e saida (Comunicação entre os servidores), portas listen, etc
 
-#netstat -ano | Out-File ./$hostName/Network_$((Get-Date).ToString('MM-dd-yyyy')).csv 
-
-#$net=netstat -ano  ConvertFrom-Csv | Export-Csv -path ./$hostName/$hostName"_Network_"$((Get-Date).ToString('MM-dd-yyyy')).csv 
-
-$data = (netstat -bano |select -skip 4 | Out-String) -replace '(?m)^  (TCP|UDP)', '$1' -replace '\r?\n\s+([^\[])', "`t`$1" -replace '\r?\n\s+\[', "`t[" -split "`n"
-
-[regex]$regex = '(?<protocol>TCP|UDP)\s+(?<address>\d+.\d+.\d+.\d+|\[::\]|\[::1\]):(?<port>\d+).+(?<state>LISTENING|\*:\*)\s+(?<pid>\d+)\s+(?<service>Can not obtain ownership information|\[\w+.exe\]|\w+\s+\[\w+.exe\])'
-
-$output = @()
-
-$data | foreach {
-    $_ -match $regex
-
-    $outputobj = @{
-        protocol = [string]$matches.protocol
-        address = [string]$matches.address -replace '\[::\]','[..]' -replace '\[::1\]','[..1]'
-        port = [int]$matches.port
-        state = [string]$matches.state -replace "\*:\*",'NA'
-        pid = [int]$matches.pid
-        service = ([string]$matches.service -replace 'Can not obtain ownership information','[System' -split '.*\[')[1] -replace '\]',''
-        subservice = ([string]$matches.service  -replace 'Can not obtain ownership information','' -split '\[.*\]')[0]
-    }
-    $output += New-Object -TypeName PSobject -Property $outputobj
-}
-
-$output |select address,port,protocol,pid,state,service,subservice | Export-Csv -path ./$hostName/$hostName"_Network_"$((Get-Date).ToString('MM-dd-yyyy')).csv 
+$nets = netstat -an 
+$output = @() 
+foreach ($n in $nets)    { 
+        $a = $n.Trim() 
+        $a = $a -replace '\s+',' ' 
+        $FileName =  $a -replace ' ',';' 
+        $output += $FileName 
+} 
+$output|Out-file ./$hostName/$hostName"_Network_"$((Get-Date).ToString('MM-dd-yyyy')).csv 
 
 # Serviços ativos:
  
